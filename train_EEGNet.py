@@ -124,7 +124,8 @@ if __name__ == "__main__":
     print("Running 'train_EEGNet.py' directly")
     
     for i in range(1, 25):
-        name = "task1_s" + str(i)
-        load_path = DATA_DIR + "/physionet-fifs/task1/s" + str(i) + "-epo.fif"
+        name = "task2_s" + str(i)
+        load_path = DATA_DIR + "/physionet-fifs/task2/s" + str(i) + "-epo.fif"
         train(name, load_path, epochs=200)
-        # evaluate(name)
+    
+    # evaluate(name)

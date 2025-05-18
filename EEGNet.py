@@ -138,7 +138,7 @@ class TrainModel():
         print("Highest Train Accuracy:", highest_train_accuracy)
 
         # Saving model
-        torch.save(model.state_dict(), 'eegnet_model.pth')
+        # torch.save(model.state_dict(), 'eegnet_model.pth')
 
         train_info = [epoch_counts, epoch_losses, epoch_accuracys]
         return model, train_info
