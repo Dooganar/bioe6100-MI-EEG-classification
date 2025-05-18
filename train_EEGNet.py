@@ -99,7 +99,7 @@ def evaluate(name):
     test_dataset = TensorDataset(X_test, y_test)
 
     trained_eegnet_model = EEGNet.EEGNetModel(chans=chans, time_points=time_points).to(device)
-    trained_eegnet_model.load_state_dict(torch.load('eegnet_model.pth', map_location=torch.device('cpu')))
+    trained_eegnet_model.load_state_dict(torch.load(MODELS_DIR + name + '.pth', map_location=torch.device('cpu')))
     trained_eegnet_model.eval()
     classes_list = ['rest', 'hands', 'feet']
     eval_model = EEGNet.EvalModel(trained_eegnet_model, MODELS_DIR + name)
