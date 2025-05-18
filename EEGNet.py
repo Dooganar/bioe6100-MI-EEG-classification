@@ -127,7 +127,9 @@ class TrainModel():
             epoch_accuracy = correct / total
             if epoch_accuracy > highest_train_accuracy:
                 highest_train_accuracy = epoch_accuracy
-            print(f"Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}, Accuracy: {(epoch_accuracy*100):.2f}%")
+
+            if (epochs < 150) or ((epoch+1) % 10 == 0):
+                print(f"Epoch {epoch+1}/{epochs}, Loss: {epoch_loss:.4f}, Accuracy: {(epoch_accuracy*100):.2f}%")
 
             epoch_counts.append(epoch+1)
             epoch_losses.append(epoch_loss)
@@ -173,7 +175,7 @@ class EvalModel():
         print("/------------------------------/")
         return accuracy
 
-    def plot_confusion_matrix(self, test_dataset, classes):
+    def plot_confusion_matrix(self, test_dataset, classes, pltshow=True, save=False):
         self.model.eval()
         y_pred = []
         y_true = []
@@ -193,10 +195,12 @@ class EvalModel():
 
         df_cm = pd.DataFrame(cf_matrix, index=classes, columns=classes)
 
-        plt.figure(figsize=(10, 7))
+        fig = plt.figure(figsize=(10, 7))
         sn.heatmap(df_cm, annot=True, cmap='Blues', fmt='.2f')
         plt.xlabel('Predicted labels')
         plt.ylabel('True labels')
         plt.title('Confusion Matrix')
-        plt.savefig(self.fig_path + '_confusion_matrix.png')
-        plt.show()
+        if save: plt.savefig(self.fig_path + '_confusion_matrix.png')
+        if pltshow: plt.show()
+        else: plt.close(fig)
+

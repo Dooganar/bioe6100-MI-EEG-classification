@@ -12,6 +12,7 @@ from torch.utils.data import TensorDataset
 from sklearn.model_selection import train_test_split
 
 import json
+import csv
 
 import EEGNet
 
@@ -24,7 +25,10 @@ def load(load_path):
     labels = epochs.events[:,-1]
     return data, labels
 
-def train(name, load_path, epochs):
+def train(name, load_path, save_path_folder, hypers):
+    epochs = hypers["epochs"]
+    test_ratio = hypers["test-ratio"]
+
     # Choosing Device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -40,12 +44,12 @@ def train(name, load_path, epochs):
     X = (data - np.mean(data)) / np.std(data)
 
     # Spliting  Data: 90% for Train and 10% for Test
-    X_train, X_test_, y_train, y_test_ = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
+    X_train, X_test_, y_train_, y_test_ = train_test_split(X, y, test_size=test_ratio, random_state=42, stratify=y)
 
     # Converting to Tensor
     X_train = torch.Tensor(X_train).unsqueeze(1).to(device)
     X_test = torch.Tensor(X_test_).unsqueeze(1).to(device)
-    y_train = torch.LongTensor(y_train).to(device)
+    y_train = torch.LongTensor(y_train_).to(device)
     y_test = torch.LongTensor(y_test_).to(device)
 
     # Creating Tensor Dataset
@@ -79,18 +83,22 @@ def train(name, load_path, epochs):
     trainer = EEGNet.TrainModel()
     trained_eegnet_model, train_info = trainer.train_model(eegnet_model, train_dataset, learning_rate=LEARNING_RATE,
                                     batch_size=BATCH_SIZE, epochs=EPOCHS)
-    torch.save(trained_eegnet_model.state_dict(), MODELS_DIR + name + '.pth')
+    torch.save(trained_eegnet_model.state_dict(), save_path_folder + name + '.pth')
     
-    train_metas = [train_info, X_test_.tolist(), y_test_.tolist(), chans, time_points]
+    train_metas = [train_info, X_test_.tolist(), y_test_.tolist(), y_train_.tolist(), chans, time_points]
 
-    with open(MODELS_DIR + name + ".json", 'w') as json_file1:
+    with open(save_path_folder + name + ".json", 'w') as json_file1:
         json.dump(train_metas, json_file1)
 
-def evaluate(name):
+def evaluate(name, saved_path, pltshow=False, save=True, verbose=False):
     with open(MODELS_DIR + name + ".json", 'r') as json_file1:
         train_metas_loaded = json.load(json_file1)
 
-    train_info, X_test_, y_test_, chans, time_points = train_metas_loaded
+    train_info, X_test_, y_test_, y_train_, chans, time_points = train_metas_loaded
+
+    if verbose: 
+        print("-------- Evaluating", name, "-----------")
+        print("y_train:", y_train_)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     X_test = torch.Tensor(X_test_).unsqueeze(1).to(device)
@@ -99,33 +107,86 @@ def evaluate(name):
     test_dataset = TensorDataset(X_test, y_test)
 
     trained_eegnet_model = EEGNet.EEGNetModel(chans=chans, time_points=time_points).to(device)
-    trained_eegnet_model.load_state_dict(torch.load(MODELS_DIR + name + '.pth', map_location=torch.device('cpu')))
+    trained_eegnet_model.load_state_dict(torch.load(saved_path, map_location=torch.device('cpu')))
     trained_eegnet_model.eval()
     classes_list = ['rest', 'hands', 'feet']
     eval_model = EEGNet.EvalModel(trained_eegnet_model, MODELS_DIR + name)
     test_accuracy = eval_model.test_model(test_dataset)
-    eval_model.plot_confusion_matrix(test_dataset, classes_list)
+    eval_model.plot_confusion_matrix(test_dataset, classes_list, pltshow=pltshow, save=save)
 
+    fig = plt.figure()
     plt.plot(train_info[0], train_info[1], label="Loss")
     plt.title("Loss Curve")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
-    plt.savefig(MODELS_DIR + name + '_loss_curve.png')
-    plt.show()
+    if save: plt.savefig(MODELS_DIR + name + '_loss_curve.png')
+    if pltshow: plt.show() 
+    else: plt.close(fig)
 
+    fig = plt.figure()
     plt.plot(train_info[0], train_info[2], label="Accuracy")
     plt.title("Accuracy Curve")
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy")
-    plt.savefig(MODELS_DIR + name + '_accuracy_curve.png')
-    plt.show()
+    if save: plt.savefig(MODELS_DIR + name + '_accuracy_curve.png')
+    if pltshow: plt.show()
+    else: plt.close(fig)
+
+    return test_accuracy
+
+def batch_train(task, subject_range, load_path_folder, save_path_folder, hypers):
+    for i in range(subject_range[0], subject_range[1]):
+        name = "task"+ str(task) + "_s" + str(i)
+        load_path = load_path_folder + "s" + str(i) + "-epo.fif"
+        train(name, load_path, save_path_folder, hypers)
+
+def batch_evaluate(name, subject_range, saved_path_folder):
+    accuracy_datas = [
+        ["Subject", "Task 1", "Task 2"]
+    ]
+
+    for i in range(subject_range[0], subject_range[1]):
+        print("Evaluating Model Performance On Subject", i)
+        name_task1 = "task1_s" + str(i)
+        name_task2 = "task2_s" + str(i)
+
+        test_accuracy_task_1 = evaluate(name_task1, save_path_folder + name_task1 + ".pth")
+        test_accuracy_task_2 = evaluate(name_task2, save_path_folder + name_task2 + ".pth")
+        accuracy_data = [i, test_accuracy_task_1, test_accuracy_task_2]
+        accuracy_datas.append(accuracy_data)
+
+    # File path for the CSV file
+    csv_file_path = saved_path_folder + "/" + name + '-test-accuracys.csv'
+
+    # Open the file in write mode
+    with open(csv_file_path, mode='w', newline='') as file:
+        # Create a csv.writer object
+        writer = csv.writer(file)
+        # Write data to the CSV file
+        writer.writerows(accuracy_datas)
+
+    # Print a confirmation message
+    print(f"CSV file '{csv_file_path}' created successfully.")
 
 if __name__ == "__main__":
     print("Running 'train_EEGNet.py' directly")
+
+    hyperparameters = {
+        "epochs": 200,
+        "test-ratio": 0.3
+    }
+
+    # name = "S3-MI-FF-8channel"
+    # load_path = DATA_DIR + "/physionet-fifs/S3-MI-FF-8channel-epo.fif"
+    # train(name, load_path, hyperparameters)
+
+    # evaluate(name, pltshow=True, save=False, verbose=True)
     
-    for i in range(1, 25):
-        name = "task2_s" + str(i)
-        load_path = DATA_DIR + "/physionet-fifs/task2/s" + str(i) + "-epo.fif"
-        train(name, load_path, epochs=200)
+    # batch_train([1, 25])
+    # batch_evaluate([1, 25])
+
+    task = 1
+    load_path_folder = DATA_DIR + "/physionet-fifs-8-channel/task"+ str(task) +"/"
+    save_path_folder = MODELS_DIR + "/physionet-8-channel/"
+    batch_train(task, [1, 25], load_path_folder, save_path_folder, hyperparameters)
     
-    # evaluate(name)
