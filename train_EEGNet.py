@@ -157,6 +157,7 @@ def batch_train(task, subject_range, load_path_folder, save_path_folder, hypers)
     for i in range(subject_range[0], subject_range[1]):
         name = "task"+ str(task) + "_s" + str(i)
         load_path = load_path_folder + "s" + str(i) + "-epo.fif"
+        print("-------- TRAINING", name, "--------")
         train(name, load_path, save_path_folder, hypers)
 
 def batch_evaluate(name, subject_range, saved_path_folder):
@@ -203,8 +204,13 @@ if __name__ == "__main__":
     
 
     task = 1
-    load_path_folder = DATA_DIR + "/physionet-fifs-8-channel/task"+ str(task) +"/"
-    save_path_folder = MODELS_DIR + "/physionet-8-channels/"
+    load_path_folder = DATA_DIR + "/physionet-fifs-64-channel/task"+ str(task) +"/"
+    save_path_folder = MODELS_DIR + "/physionet-64-channels/"
+    batch_train(task, [1, 110], load_path_folder, save_path_folder, hyperparameters)
+
+    task = 2
+    load_path_folder = DATA_DIR + "/physionet-fifs-64-channel/task"+ str(task) +"/"
+    save_path_folder = MODELS_DIR + "/physionet-64-channels/"
     batch_train(task, [1, 110], load_path_folder, save_path_folder, hyperparameters)
 
     # batch_evaluate("models-8ch-tasks12-200epoch", [1, 25], save_path_folder)
