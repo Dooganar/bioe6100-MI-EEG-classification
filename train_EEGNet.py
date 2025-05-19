@@ -58,7 +58,7 @@ def train(name, load_path, save_path_folder, hypers):
         print(f"class_counts[{i}] =", class_counts[i], "| Weight =", class_weights[i])
 
     # Loss Function
-    criterion = nn.CrossEntropyLoss(weight=torch.tensor(class_weights, dtype=torch.float32))
+    criterion = nn.CrossEntropyLoss(weight=torch.tensor(class_weights, dtype=torch.float32).to(device))
     # ---------------------------------------------------------------
 
     # Spliting  Data: 90% for Train and 10% for Test
