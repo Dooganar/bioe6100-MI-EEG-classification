@@ -204,7 +204,7 @@ if __name__ == "__main__":
 
     task = 1
     load_path_folder = DATA_DIR + "/physionet-fifs-8-channel/task"+ str(task) +"/"
-    save_path_folder = MODELS_DIR + "/physionet-8-channel/"
+    save_path_folder = MODELS_DIR + "/physionet-8-channels/"
     batch_train(task, [1, 110], load_path_folder, save_path_folder, hyperparameters)
 
     # batch_evaluate("models-8ch-tasks12-200epoch", [1, 25], save_path_folder)
