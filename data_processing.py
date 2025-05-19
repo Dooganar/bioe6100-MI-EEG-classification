@@ -6,7 +6,7 @@ import numpy as np
 
 DATA_DIR = "/home/reuben/Documents/eeg-data/"
 
-def process_physionet(subject, name, task, verbose=False, visualise=False, save=True):
+def process_physionet(subject, name, task, data_path, verbose=False, visualise=False, save=True, drop_channels=True):
     """
     Task 1 (open and close left or right fist)
     Task 2 (imagine opening and closing left or right fist)
@@ -54,7 +54,7 @@ def process_physionet(subject, name, task, verbose=False, visualise=False, save=
     raw_obj.rename_channels(map)
     raw_obj.set_montage("standard_1005")
 
-    print("Channels (before drop):", raw_obj.ch_names)
+    print("Channels:", raw_obj.ch_names)
     channels_to_drop = ['FC5', 'FC3', 'FC1', 'FCz', 'FC2', 'FC4', 
                      'FC6', 'C5', 'C3', 'C1', 'Cz', 'C2', 'C4', 
                      'C6', 'CP5', 'CP3', 'CP1', 'CPz', 'CP2', 'CP4', 
@@ -70,9 +70,9 @@ def process_physionet(subject, name, task, verbose=False, visualise=False, save=
     for keep in channels_to_keep:
         channels_to_drop.remove(keep)
 
-    raw_obj.drop_channels(channels_to_drop)
-
-    print("Channels (after drop):", raw_obj.ch_names)
+    if drop_channels:
+        raw_obj.drop_channels(channels_to_drop)
+        print("Channels (after drop):", raw_obj.ch_names)
 
     # Extract events from raw data
     events, event_ids = mne.events_from_annotations(raw_obj, event_id='auto')
@@ -83,7 +83,7 @@ def process_physionet(subject, name, task, verbose=False, visualise=False, save=
 
     if save:
         # Save Epochs
-        epochs.save(DATA_DIR + '/physionet-fifs-8-channel/' + name + '-epo.fif', overwrite=True)
+        epochs.save(data_path + name + '-epo.fif', overwrite=True)
     
     # -------------------------------------
     if verbose:
@@ -155,9 +155,11 @@ if __name__ == "__main__":
     print("Running `data_processing.py` directly")
     # process_physionet(3, "S3-MI-FF", 4, verbose=True, visualise=True, save=False)
 
-    task = 1
-    for i in range(1, 25):
-        process_physionet(i, "/task" + str(task) + "/s" + str(i), task)
+    task = 2
+    data_path = DATA_DIR + 'physionet-fifs-8-channel/task' + str(task) + "/"
+
+    # for i in range(1, 110):
+    #     process_physionet(i, "s" + str(i), task, data_path, drop_channels=True)
 
     # process_physionet(3, "S3-MI-FF-8channel", 4)
 

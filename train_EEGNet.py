@@ -10,6 +10,9 @@ from torchsummary import summary
 from torch.utils.data import TensorDataset
 
 from sklearn.model_selection import train_test_split
+from sklearn.utils.class_weight import compute_class_weight
+
+import pandas as pd
 
 import json
 import csv
@@ -32,9 +35,6 @@ def train(name, load_path, save_path_folder, hypers):
     # Choosing Device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Loss Function
-    criterion = nn.CrossEntropyLoss()
-
     data, labels = load(load_path)
 
     # Normalizing Labels to [0, 1, 2]
@@ -42,6 +42,24 @@ def train(name, load_path, save_path_folder, hypers):
 
     # Normalizing Input features: z-score(mean=0, std=1)
     X = (data - np.mean(data)) / np.std(data)
+
+    # ------------------Consider Class Imbalances-------------------
+    class_weights = compute_class_weight(
+        class_weight="balanced",
+        classes=np.unique(y),
+        y=y
+    )
+    
+    number_of_classes = len(np.unique(y))
+    print("number_of_classes:", number_of_classes)
+    class_counts = []
+    for i in range(number_of_classes):
+        class_counts.append(y.tolist().count(i))
+        print(f"class_counts[{i}] =", class_counts[i], "| Weight =", class_weights[i])
+
+    # Loss Function
+    criterion = nn.CrossEntropyLoss(weight=torch.tensor(class_weights, dtype=torch.float32))
+    # ---------------------------------------------------------------
 
     # Spliting  Data: 90% for Train and 10% for Test
     X_train, X_test_, y_train_, y_test_ = train_test_split(X, y, test_size=test_ratio, random_state=42, stratify=y)
@@ -81,20 +99,21 @@ def train(name, load_path, save_path_folder, hypers):
     BATCH_SIZE = 64
     LEARNING_RATE = 0.001
     trainer = EEGNet.TrainModel()
-    trained_eegnet_model, train_info = trainer.train_model(eegnet_model, train_dataset, learning_rate=LEARNING_RATE,
+    trained_eegnet_model, train_info = trainer.train_model(eegnet_model, train_dataset, criterion, learning_rate=LEARNING_RATE,
                                     batch_size=BATCH_SIZE, epochs=EPOCHS)
     torch.save(trained_eegnet_model.state_dict(), save_path_folder + name + '.pth')
     
-    train_metas = [train_info, X_test_.tolist(), y_test_.tolist(), y_train_.tolist(), chans, time_points]
+    train_metas = [train_info, X_test_.tolist(), y_test_.tolist(), y_train_.tolist(), chans, time_points, class_counts]
 
     with open(save_path_folder + name + ".json", 'w') as json_file1:
         json.dump(train_metas, json_file1)
 
-def evaluate(name, saved_path, pltshow=False, save=True, verbose=False):
-    with open(MODELS_DIR + name + ".json", 'r') as json_file1:
+def evaluate(name, saved_path_folder, pltshow=False, save=True, verbose=False):
+    saved_path = saved_path_folder + name + ".pth"
+    with open(saved_path_folder + name + ".json", 'r') as json_file1:
         train_metas_loaded = json.load(json_file1)
 
-    train_info, X_test_, y_test_, y_train_, chans, time_points = train_metas_loaded
+    train_info, X_test_, y_test_, y_train_, chans, time_points, class_counts = train_metas_loaded
 
     if verbose: 
         print("-------- Evaluating", name, "-----------")
@@ -110,7 +129,7 @@ def evaluate(name, saved_path, pltshow=False, save=True, verbose=False):
     trained_eegnet_model.load_state_dict(torch.load(saved_path, map_location=torch.device('cpu')))
     trained_eegnet_model.eval()
     classes_list = ['rest', 'hands', 'feet']
-    eval_model = EEGNet.EvalModel(trained_eegnet_model, MODELS_DIR + name)
+    eval_model = EEGNet.EvalModel(trained_eegnet_model, saved_path_folder + name)
     test_accuracy = eval_model.test_model(test_dataset)
     eval_model.plot_confusion_matrix(test_dataset, classes_list, pltshow=pltshow, save=save)
 
@@ -119,7 +138,7 @@ def evaluate(name, saved_path, pltshow=False, save=True, verbose=False):
     plt.title("Loss Curve")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
-    if save: plt.savefig(MODELS_DIR + name + '_loss_curve.png')
+    if save: plt.savefig(save_path_folder + name + '_loss_curve.png')
     if pltshow: plt.show() 
     else: plt.close(fig)
 
@@ -128,7 +147,7 @@ def evaluate(name, saved_path, pltshow=False, save=True, verbose=False):
     plt.title("Accuracy Curve")
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy")
-    if save: plt.savefig(MODELS_DIR + name + '_accuracy_curve.png')
+    if save: plt.savefig(save_path_folder + name + '_accuracy_curve.png')
     if pltshow: plt.show()
     else: plt.close(fig)
 
@@ -150,8 +169,8 @@ def batch_evaluate(name, subject_range, saved_path_folder):
         name_task1 = "task1_s" + str(i)
         name_task2 = "task2_s" + str(i)
 
-        test_accuracy_task_1 = evaluate(name_task1, save_path_folder + name_task1 + ".pth")
-        test_accuracy_task_2 = evaluate(name_task2, save_path_folder + name_task2 + ".pth")
+        test_accuracy_task_1 = evaluate(name_task1, saved_path_folder)
+        test_accuracy_task_2 = evaluate(name_task2, saved_path_folder)
         accuracy_data = [i, test_accuracy_task_1, test_accuracy_task_2]
         accuracy_datas.append(accuracy_data)
 
@@ -176,17 +195,17 @@ if __name__ == "__main__":
         "test-ratio": 0.3
     }
 
-    # name = "S3-MI-FF-8channel"
-    # load_path = DATA_DIR + "/physionet-fifs/S3-MI-FF-8channel-epo.fif"
-    # train(name, load_path, hyperparameters)
+    # name = "task1_s1"
+    # saved_path_folder = MODELS_DIR + "physionet-8-channel/"
 
-    # evaluate(name, pltshow=True, save=False, verbose=True)
+    # train(name, load_path, hyperparameters)
+    # evaluate(name, saved_path_folder, pltshow=True, save=False, verbose=True)
     
-    # batch_train([1, 25])
-    # batch_evaluate([1, 25])
 
     task = 1
     load_path_folder = DATA_DIR + "/physionet-fifs-8-channel/task"+ str(task) +"/"
     save_path_folder = MODELS_DIR + "/physionet-8-channel/"
-    batch_train(task, [1, 25], load_path_folder, save_path_folder, hyperparameters)
+    batch_train(task, [1, 110], load_path_folder, save_path_folder, hyperparameters)
+
+    # batch_evaluate("models-8ch-tasks12-200epoch", [1, 25], save_path_folder)
     

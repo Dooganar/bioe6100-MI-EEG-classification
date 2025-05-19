@@ -92,9 +92,9 @@ class TrainModel():
     def __init__(self,):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def train_model(self, model, train_dataset, learning_rate=0.001, batch_size=64, epochs=500):
+    def train_model(self, model, train_dataset, criterion, learning_rate=0.001, batch_size=64, epochs=500):
         model = model.to(self.device)
-        criterion = nn.CrossEntropyLoss()
+        # criterion = nn.CrossEntropyLoss()
         optimizer = optim.Adam(model.parameters(), lr=learning_rate)
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
         highest_train_accuracy = 0.0
