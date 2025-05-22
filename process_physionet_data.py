@@ -33,7 +33,7 @@ def process_physionet(subject, name, task, data_path, verbose=False, visualise=F
 
     # Combine all loaded runs
     raw_obj = concatenate_raws(raws)
-    raw_obj = raw_obj.filter(l_freq=0.2, h_freq=50)
+    raw_obj = raw_obj.filter(l_freq=0.2, h_freq=40)
     
 
     map = {

@@ -20,7 +20,7 @@ import csv
 import EEGNet
 
 DATA_DIR = "/home/reuben/Documents/eeg-data/"
-MODELS_DIR = "./models/"
+MODELS_DIR = "../models/"
 
 def load(load_path):
     epochs = mne.read_epochs(load_path)
@@ -110,10 +110,13 @@ def train(name, load_path, save_path_folder, hypers):
 
 def evaluate(name, saved_path_folder, pltshow=False, save=True, verbose=False):
     saved_path = saved_path_folder + name + ".pth"
+    
     with open(saved_path_folder + name + ".json", 'r') as json_file1:
         train_metas_loaded = json.load(json_file1)
 
     train_info, X_test_, y_test_, y_train_, chans, time_points, class_counts = train_metas_loaded
+    # print(train_metas_loaded)
+    # train_info, X_test_, y_test_, y_train_, chans, time_points = train_metas_loaded
 
     if verbose: 
         print("-------- Evaluating", name, "-----------")
@@ -128,7 +131,7 @@ def evaluate(name, saved_path_folder, pltshow=False, save=True, verbose=False):
     trained_eegnet_model = EEGNet.EEGNetModel(chans=chans, time_points=time_points).to(device)
     trained_eegnet_model.load_state_dict(torch.load(saved_path, map_location=torch.device('cpu')))
     trained_eegnet_model.eval()
-    classes_list = ['rest', 'hands', 'feet']
+    classes_list = ['rest', 'left-fist', 'right-fist']
     eval_model = EEGNet.EvalModel(trained_eegnet_model, saved_path_folder + name)
     test_accuracy = eval_model.test_model(test_dataset)
     eval_model.plot_confusion_matrix(test_dataset, classes_list, pltshow=pltshow, save=save)
@@ -203,15 +206,24 @@ if __name__ == "__main__":
     # evaluate(name, saved_path_folder, pltshow=True, save=False, verbose=True)
     
 
-    task = 1
-    load_path_folder = DATA_DIR + "/physionet-fifs-64-channel/task"+ str(task) +"/"
-    save_path_folder = MODELS_DIR + "/physionet-64-channels/"
-    batch_train(task, [1, 110], load_path_folder, save_path_folder, hyperparameters)
+    # task = 1
+    # load_path_folder = DATA_DIR + "/physionet-fifs-64-channel/task"+ str(task) +"/"
+    # save_path_folder = MODELS_DIR + "/physionet-64-channels/"
+    # # batch_train(task, [1, 10], load_path_folder, save_path_folder, hyperparameters)
 
-    task = 2
-    load_path_folder = DATA_DIR + "/physionet-fifs-64-channel/task"+ str(task) +"/"
-    save_path_folder = MODELS_DIR + "/physionet-64-channels/"
-    batch_train(task, [1, 110], load_path_folder, save_path_folder, hyperparameters)
+    # task = 2
+    # load_path_folder = DATA_DIR + "/physionet-fifs-64-channel/task"+ str(task) +"/"
+    # save_path_folder = MODELS_DIR + "/physionet-64-channels/"
+    # # batch_train(task, [1, 10], load_path_folder, save_path_folder, hyperparameters)
 
+    # save_path_folder = MODELS_DIR + "physionet-8-channels/"
     # batch_evaluate("models-8ch-tasks12-200epoch", [1, 25], save_path_folder)
+
+    name = "data-reuben-0342-1505-3-classes"
+    load_path = DATA_DIR + "/reuben-openbci/data-reuben-0342-1505-3-classes/data-reuben-0342-1505-3-classes-epo.fif"
+    save_path_folder = MODELS_DIR + "reuben-openbci/data-reuben-0342-1505-3-classes"
+
+    # train(name, load_path, save_path_folder, hyperparameters)
+    evaluate(name, save_path_folder, pltshow=True, save=False, verbose=True)
+
     
