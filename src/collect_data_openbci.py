@@ -5,15 +5,40 @@ from pprint import pprint
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
 
 import json
+import random
 
 marker_dict = {
     0: "Nothing",
-    1: "Left Hand", 
-    2: "Right Hand", 
-    3: "Rest"
+    1: "Rest", 
+    2: "Left Fist", 
+    3: "Right Fist"
 }
 
-prompt_order = [0, 3, 3, 2, 3, 1, 3, 2, 3, 2, 3, 1, 3, 1, 3, 2, 3, 1, 3, 3, 0]
+def generate_prompt_order(n_pairs):
+    """
+    Generate a prompt order list with equal numbers of Left and Right Fist prompts,
+    inserting a Rest (1) between each, and starting with [Nothing, Rest] and ending with Rest.
+
+    Parameters:
+        n_pairs (int): Number of Left and Right Fist prompts each (total 2 * n_pairs active prompts)
+
+    Returns:
+        List[int]: Prompt order list
+    """
+    # Create and shuffle active prompts
+    active_prompts = [2] * n_pairs + [3] * n_pairs
+    random.shuffle(active_prompts)
+
+    # Start with Nothing and Rest
+    prompt_order = [0, 1]
+
+    # Interleave Rest (3) between each active prompt
+    for prompt in active_prompts:
+        prompt_order.append(prompt)
+        prompt_order.append(1)
+
+    return prompt_order
+
 
 def add_nothing_prompts(lst):
     result = []
@@ -23,18 +48,21 @@ def add_nothing_prompts(lst):
             result.append(0)
     return result
 
-print(prompt_order)
-prompt_order = add_nothing_prompts(prompt_order)
-print(prompt_order)
 
 def main():
+    batch_size = 5
+
+    prompt_order = generate_prompt_order(batch_size)
+    print(prompt_order)
+    prompt_order = add_nothing_prompts(prompt_order)
+    print(prompt_order)
 
     board_id = BoardIds.CYTON_BOARD
     
     BoardShim.enable_dev_board_logger()
 
     params = BrainFlowInputParams()
-    params.serial_port = "/dev/ttyUSB1"
+    params.serial_port = "/dev/ttyUSB0"
 
     pprint(BoardShim.get_board_descr(board_id))
 
@@ -51,6 +79,7 @@ def main():
 
     eeg_markers = []
 
+    start_time = time.time()
     prev_time = time.time()
 
     while not done:
@@ -60,74 +89,37 @@ def main():
         cur_time = time.time()
 
         if cur_time - prev_time > 2: 
-            print(marker_dict[prompt_order[prompt_iter]])
+            print(prompt_iter, '|', marker_dict[prompt_order[prompt_iter]])
             prompt_iter += 1
             prev_time = cur_time
 
             if prompt_iter >= len(prompt_order):
-                done = True
-                continue
+                user_continue = input("Continue for another batch? (y/n)")
+                if user_continue == 'y':
+                    prompt_order = generate_prompt_order(batch_size)
+                    print(prompt_order)
+                    prompt_order = add_nothing_prompts(prompt_order)
+                    print(prompt_order)
+                    prompt_iter = 0
+                    data_discard = board.get_board_data()
+                    print("Data-discarded:", len(data_discard))
+                    print(marker_dict[prompt_order[prompt_iter]])
+                    continue
+                else:
+                    done = True
+                    continue
 
-        # data = board.get_current_board_data (256) # get latest 256 packages or less, doesnt remove them from internal buffer
         data = board.get_board_data()  # get all data and remove it from internal buffer
 
         channels = board.get_eeg_channels(board_id)
-        # print(channels)
-
 
         if iter == 1:
             print("Number of Channels:", len(data))
 
-        # print(time.time())
-
         eeg_sample = [data[i].tolist() for i in channels]
-
-        # print(eeg_sample)
 
         eeg_samples.append(eeg_sample)
         eeg_markers.append(prompt_order[prompt_iter])
-
-        # print(data[2])
-        
-        # break
-
-        # print(f"---------{iter}---------")
-
-        # print("Channel 1:", eeg_sample[0])
-        # print("Channel 2:", eeg_sample[1])
-        # print("Channel 3:", eeg_sample[2])
-        # print("Channel 4:", eeg_sample[3])
-        # print("Channel 5:", eeg_sample[4])
-        # print("Channel 6:", eeg_sample[5])
-        # print("Channel 7:", eeg_sample[6])
-        # print("Channel 8:", eeg_sample[7])
-       
-        # print("Channel 0:", data[0])
-        # print("Channel 1:", data[1])
-        # print("Channel 2:", data[2])
-        # print("Channel 3:", data[3])
-        # print("Channel 4:", data[4])
-        # print("Channel 5:", data[5])
-        # print("Channel 6:", data[6])
-        # print("Channel 7:", data[7])
-        # print("Channel 8:", data[8])
-        # print("Channel 9:", data[9])
-        # print("Channel 10:", data[10])
-        # print("Channel 11:", data[11])
-        # print("Channel 12:", data[12])
-        # print("Channel 13:", data[13])
-        # print("Channel 14:", data[14])
-        # print("Channel 15:", data[15])
-        # print("Channel 16:", data[16])
-        # print("Channel 17:", data[17])
-        # print("Channel 18:", data[18])
-        # print("Channel 19:", data[19])
-        # print("Channel 20:", data[20])
-        # print("Channel 21:", data[21])
-        # print("Channel 22:", data[22])
-        # print("Channel 23:", data[23])
-
-    # return
 
     board.stop_stream()
     board.release_session()

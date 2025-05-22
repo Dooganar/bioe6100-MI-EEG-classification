@@ -17,7 +17,7 @@ import pandas as pd
 import json
 import csv
 
-import EEGNet
+import eegnet
 
 DATA_DIR = "/home/reuben/Documents/eeg-data/"
 MODELS_DIR = "../models/"
@@ -28,7 +28,7 @@ def load(load_path):
     labels = epochs.events[:,-1]
     return data, labels
 
-def train(name, load_path, save_path_folder, hypers):
+def train(name, load_path, save_path_folder, hypers, save=True):
     epochs = hypers["epochs"]
     test_ratio = hypers["test-ratio"]
 
@@ -37,8 +37,12 @@ def train(name, load_path, save_path_folder, hypers):
 
     data, labels = load(load_path)
 
+    print("raw labels: ", labels)
+
     # Normalizing Labels to [0, 1, 2]
     y = labels - np.min(labels)
+
+    print("normalized labels: ", y)
 
     # Normalizing Input features: z-score(mean=0, std=1)
     X = (data - np.mean(data)) / np.std(data)
@@ -92,21 +96,24 @@ def train(name, load_path, save_path_folder, hypers):
     chans = X_train.size()[2]
     time_points = X_train.size()[3]
 
-    eegnet_model = EEGNet.EEGNetModel(chans=chans, time_points=time_points).to(device)
+    eegnet_model = eegnet.EEGNetModel(chans=chans, time_points=time_points).to(device)
 
     # Training Hyperparameters
     EPOCHS = epochs
     BATCH_SIZE = 64
     LEARNING_RATE = 0.001
-    trainer = EEGNet.TrainModel()
+    trainer = eegnet.TrainModel()
     trained_eegnet_model, train_info = trainer.train_model(eegnet_model, train_dataset, criterion, learning_rate=LEARNING_RATE,
                                     batch_size=BATCH_SIZE, epochs=EPOCHS)
-    torch.save(trained_eegnet_model.state_dict(), save_path_folder + name + '.pth')
+    
+    if save:
+        torch.save(trained_eegnet_model.state_dict(), save_path_folder + name + '.pth')
     
     train_metas = [train_info, X_test_.tolist(), y_test_.tolist(), y_train_.tolist(), chans, time_points, class_counts]
 
-    with open(save_path_folder + name + ".json", 'w') as json_file1:
-        json.dump(train_metas, json_file1)
+    if save:
+        with open(save_path_folder + name + ".json", 'w') as json_file1:
+            json.dump(train_metas, json_file1)
 
 def evaluate(name, saved_path_folder, pltshow=False, save=True, verbose=False):
     saved_path = saved_path_folder + name + ".pth"
@@ -128,11 +135,11 @@ def evaluate(name, saved_path_folder, pltshow=False, save=True, verbose=False):
 
     test_dataset = TensorDataset(X_test, y_test)
 
-    trained_eegnet_model = EEGNet.EEGNetModel(chans=chans, time_points=time_points).to(device)
+    trained_eegnet_model = eegnet.EEGNetModel(chans=chans, time_points=time_points).to(device)
     trained_eegnet_model.load_state_dict(torch.load(saved_path, map_location=torch.device('cpu')))
     trained_eegnet_model.eval()
     classes_list = ['rest', 'left-fist', 'right-fist']
-    eval_model = EEGNet.EvalModel(trained_eegnet_model, saved_path_folder + name)
+    eval_model = eegnet.EvalModel(trained_eegnet_model, saved_path_folder + name)
     test_accuracy = eval_model.test_model(test_dataset)
     eval_model.plot_confusion_matrix(test_dataset, classes_list, pltshow=pltshow, save=save)
 
@@ -192,17 +199,18 @@ def batch_evaluate(name, subject_range, saved_path_folder):
     print(f"CSV file '{csv_file_path}' created successfully.")
 
 if __name__ == "__main__":
-    print("Running 'train_EEGNet.py' directly")
+    print("Running 'train_eegnet.py' directly")
 
     hyperparameters = {
         "epochs": 200,
         "test-ratio": 0.3
     }
 
-    # name = "task1_s1"
-    # saved_path_folder = MODELS_DIR + "physionet-8-channel/"
+    name = "task1_s1"
+    load_path = DATA_DIR + "/physionet-fifs-8-channel/task1/s1-epo.fif"
+    save_path_folder = MODELS_DIR + "physionet-8-channel/"
 
-    # train(name, load_path, hyperparameters)
+    train(name, load_path, save_path_folder, hyperparameters, save=False)
     # evaluate(name, saved_path_folder, pltshow=True, save=False, verbose=True)
     
 
@@ -219,11 +227,13 @@ if __name__ == "__main__":
     # save_path_folder = MODELS_DIR + "physionet-8-channels/"
     # batch_evaluate("models-8ch-tasks12-200epoch", [1, 25], save_path_folder)
 
-    name = "data-reuben-0342-1505-3-classes"
-    load_path = DATA_DIR + "/reuben-openbci/data-reuben-0342-1505-3-classes/data-reuben-0342-1505-3-classes-epo.fif"
-    save_path_folder = MODELS_DIR + "reuben-openbci/data-reuben-0342-1505-3-classes"
 
-    # train(name, load_path, save_path_folder, hyperparameters)
-    evaluate(name, save_path_folder, pltshow=True, save=False, verbose=True)
+    # ----------- TRAIN ON OPEN BCI DATA --------------
+    # name = "data-reuben-0342-1505-3-classes"
+    # load_path = DATA_DIR + "/reuben-openbci/data-reuben-0342-1505-3-classes/data-reuben-0342-1505-3-classes-epo.fif"
+    # save_path_folder = MODELS_DIR + "reuben-openbci/data-reuben-0342-1505-3-classes"
+
+    # train(name, load_path, save_path_folder, hyperparameters, save=False)
+    # evaluate(name, save_path_folder, pltshow=True, save=False, verbose=True)
 
     

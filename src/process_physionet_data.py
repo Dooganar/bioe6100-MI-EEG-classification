@@ -153,9 +153,11 @@ def process_physionet(subject, name, task, data_path, verbose=False, visualise=F
 
 if __name__ == "__main__":
     print("Running `data_processing.py` directly")
-    # process_physionet(3, "S3-MI-FF", 4, verbose=True, visualise=True, save=False)
 
-    task = 2
+    process_physionet(3, "S3-MI-FF", 1, "~/Downloads/test", verbose=True, visualise=True, save=False)
+
+
+    task = 1
     data_path = DATA_DIR + 'physionet-fifs-8-channel/task' + str(task) + "/"
 
     # for i in range(1, 110):
