@@ -44,8 +44,11 @@ def train(name, load_path, save_path_folder, hypers, save=True):
 
     print("normalized labels: ", y)
 
+    # Remove last marker channel
+    eeg_data = data[:, 0:8]
+
     # Normalizing Input features: z-score(mean=0, std=1)
-    X = (data - np.mean(data)) / np.std(data)
+    X = (eeg_data - np.mean(eeg_data)) / np.std(eeg_data)
 
     # ------------------Consider Class Imbalances-------------------
     class_weights = compute_class_weight(
@@ -206,11 +209,11 @@ if __name__ == "__main__":
         "test-ratio": 0.3
     }
 
-    name = "task1_s1"
-    load_path = DATA_DIR + "/physionet-fifs-8-channel/task1/s1-epo.fif"
-    save_path_folder = MODELS_DIR + "physionet-8-channel/"
+    # name = "task1_s1"
+    # load_path = DATA_DIR + "/physionet-fifs-8-channel/task1/s1-epo.fif"
+    # save_path_folder = MODELS_DIR + "physionet-8-channel/"
 
-    train(name, load_path, save_path_folder, hyperparameters, save=False)
+    # train(name, load_path, save_path_folder, hyperparameters, save=False)
     # evaluate(name, saved_path_folder, pltshow=True, save=False, verbose=True)
     
 
@@ -229,11 +232,11 @@ if __name__ == "__main__":
 
 
     # ----------- TRAIN ON OPEN BCI DATA --------------
-    # name = "data-reuben-0342-1505-3-classes"
-    # load_path = DATA_DIR + "/reuben-openbci/data-reuben-0342-1505-3-classes/data-reuben-0342-1505-3-classes-epo.fif"
-    # save_path_folder = MODELS_DIR + "reuben-openbci/data-reuben-0342-1505-3-classes"
+    name = "data-reuben-2122-2205-3-classes-MI"
+    load_path = DATA_DIR + "/reuben-openbci/data-reuben-2122-2205-3-classes/data-reuben-2122-2205-3-classes-MI-epo.fif"
+    save_path_folder = MODELS_DIR + "reuben-openbci/data-reuben-2122-2205-3-classes/"
 
-    # train(name, load_path, save_path_folder, hyperparameters, save=False)
-    # evaluate(name, save_path_folder, pltshow=True, save=False, verbose=True)
+    # train(name, load_path, save_path_folder, hyperparameters, save=True)
+    evaluate(name, save_path_folder, pltshow=True, save=True, verbose=True)
 
     
