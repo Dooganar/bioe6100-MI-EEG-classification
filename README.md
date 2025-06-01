@@ -28,13 +28,13 @@ bioe6100-MI-EEG-classification/
 ├── results/
 │   ├── models-64ch-tasks12-200epoch-test-accuracys.csv
 │   ├── models-8ch-tasks12-200epoch-test-accuracys.csv
-│   └── results\_analysis.py
+│   └── results_analysis.py
 ├── src/
-│   ├── eegnet.py                    # EEGNet architecture and training class (PyTorch)
-│   ├── train\_eegnet.py             # Script for model training and evaluation
-│   ├── process\_physionet\_data.py   # Preprocessing pipeline for Dataset A
-│   ├── collect\_openbci\_data.py     # EEG acquisition script using BrainFlow (Dataset B)
-│   └── process\_openbci\_data.py     # Preprocessing pipeline for Dataset B
+│   ├── eegnet.py                   # EEGNet architecture and training class (PyTorch)
+│   ├── train_eegnet.py             # Script for model training and evaluation
+│   ├── proces_physionet_data.py    # Preprocessing pipeline for Dataset A
+│   ├── collect_openbci_data.py     # EEG acquisition script using BrainFlow (Dataset B)
+│   └── process_openbci_data.py     # Preprocessing pipeline for Dataset B
 └── README.md
 ```
 
