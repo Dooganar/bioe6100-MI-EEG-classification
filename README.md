@@ -23,6 +23,7 @@ Full results and discussion can be found in the [final report PDF](./EEGNet-MM-v
 
 ## Repository Structure
 
+```
 bioe6100-MI-EEG-classification/
 ├── results/
 │   ├── models-64ch-tasks12-200epoch-test-accuracys.csv
@@ -35,6 +36,7 @@ bioe6100-MI-EEG-classification/
 │   ├── collect\_openbci\_data.py     # EEG acquisition script using BrainFlow (Dataset B)
 │   └── process\_openbci\_data.py     # Preprocessing pipeline for Dataset B
 └── README.md
+```
 
 
 ## Acknowledgements
