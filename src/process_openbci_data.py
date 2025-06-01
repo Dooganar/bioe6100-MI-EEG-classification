@@ -152,4 +152,4 @@ if __name__ == "__main__":
     name = "data-reuben-2122-2205-3-classes"
     jsons_path = DATA_DIR + "/reuben-openbci/" + name
     samples, markers = load_openbci_data(jsons_path, prompt_type, verbose=True)
-    convert_to_mne(name, name + '-' + prompt_type, jsons_path, samples, markers, save=True)
+    convert_to_mne(name, name + '-' + prompt_type, jsons_path, samples, markers, save=False)

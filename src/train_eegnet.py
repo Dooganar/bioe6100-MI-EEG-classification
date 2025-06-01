@@ -2,6 +2,7 @@ import mne
 
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sn
 
 # Torch
 import torch
@@ -125,6 +126,7 @@ def evaluate(name, saved_path_folder, pltshow=False, save=True, verbose=False):
         train_metas_loaded = json.load(json_file1)
 
     train_info, X_test_, y_test_, y_train_, chans, time_points, class_counts = train_metas_loaded
+    print("class_counts:", class_counts)
     # print(train_metas_loaded)
     # train_info, X_test_, y_test_, y_train_, chans, time_points = train_metas_loaded
 
@@ -144,7 +146,7 @@ def evaluate(name, saved_path_folder, pltshow=False, save=True, verbose=False):
     classes_list = ['rest', 'left-fist', 'right-fist']
     eval_model = eegnet.EvalModel(trained_eegnet_model, saved_path_folder + name)
     test_accuracy = eval_model.test_model(test_dataset)
-    eval_model.plot_confusion_matrix(test_dataset, classes_list, pltshow=pltshow, save=save)
+    cf_matrix = eval_model.plot_confusion_matrix(test_dataset, classes_list, pltshow=pltshow, save=save)
 
     fig = plt.figure()
     plt.plot(train_info[0], train_info[1], label="Loss")
@@ -164,7 +166,78 @@ def evaluate(name, saved_path_folder, pltshow=False, save=True, verbose=False):
     if pltshow: plt.show()
     else: plt.close(fig)
 
-    return test_accuracy
+    return test_accuracy, cf_matrix
+
+
+def evaluate_MM_on_MI(name, saved_path_folder, load_test_path, pltshow=False, save=True, verbose=False):
+    saved_path = saved_path_folder + name + ".pth"
+    
+    with open(saved_path_folder + name + ".json", 'r') as json_file1:
+        train_metas_loaded = json.load(json_file1)
+
+    train_info, X_test_, y_test_, y_train_, chans, time_points, class_counts = train_metas_loaded
+    print("class_counts:", class_counts)
+    # print(train_metas_loaded)
+    # train_info, X_test_, y_test_, y_train_, chans, time_points = train_metas_loaded
+
+    if verbose: 
+        print("-------- Evaluating", name, "-----------")
+
+
+    # ----------- LOAD TEST SET: -------------
+
+    data, labels = load(load_test_path)
+
+    print("raw labels: ", labels)
+
+    # Normalizing Labels to [0, 1, 2]
+    y = labels - np.min(labels)
+
+    print("normalized labels: ", y)
+
+    # Remove last marker channel
+    eeg_data = data[:, 0:8]
+
+    # Normalizing Input features: z-score(mean=0, std=1)
+    X = (eeg_data - np.mean(eeg_data)) / np.std(eeg_data)
+
+    # ----------------------------------------
+
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    X_test = torch.Tensor(X).unsqueeze(1).to(device)
+    y_test = torch.LongTensor(y).to(device)
+
+    test_dataset = TensorDataset(X_test, y_test)
+
+    trained_eegnet_model = eegnet.EEGNetModel(chans=chans, time_points=time_points).to(device)
+    trained_eegnet_model.load_state_dict(torch.load(saved_path, map_location=torch.device('cpu')))
+    trained_eegnet_model.eval()
+    classes_list = ['rest', 'left-fist', 'right-fist']
+    eval_model = eegnet.EvalModel(trained_eegnet_model, saved_path_folder + name)
+    test_accuracy = eval_model.test_model(test_dataset)
+    cf_matrix = eval_model.plot_confusion_matrix(test_dataset, classes_list, pltshow=pltshow, save=save)
+
+    fig = plt.figure()
+    plt.plot(train_info[0], train_info[1], label="Loss")
+    plt.title("Loss Curve")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    if save: plt.savefig(save_path_folder + name + '_loss_curve.png')
+    if pltshow: plt.show() 
+    else: plt.close(fig)
+
+    fig = plt.figure()
+    plt.plot(train_info[0], train_info[2], label="Accuracy")
+    plt.title("Accuracy Curve")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    if save: plt.savefig(save_path_folder + name + '_accuracy_curve.png')
+    if pltshow: plt.show()
+    else: plt.close(fig)
+
+    return test_accuracy, cf_matrix
+
 
 def batch_train(task, subject_range, load_path_folder, save_path_folder, hypers):
     for i in range(subject_range[0], subject_range[1]):
@@ -173,20 +246,25 @@ def batch_train(task, subject_range, load_path_folder, save_path_folder, hypers)
         print("-------- TRAINING", name, "--------")
         train(name, load_path, save_path_folder, hypers)
 
-def batch_evaluate(name, subject_range, saved_path_folder):
+def batch_evaluate(name, subject_range, saved_path_folder, save=True):
     accuracy_datas = [
         ["Subject", "Task 1", "Task 2"]
     ]
+
+    cf_matrices_t1 = []
+    cf_matrices_t2 = []
 
     for i in range(subject_range[0], subject_range[1]):
         print("Evaluating Model Performance On Subject", i)
         name_task1 = "task1_s" + str(i)
         name_task2 = "task2_s" + str(i)
 
-        test_accuracy_task_1 = evaluate(name_task1, saved_path_folder)
-        test_accuracy_task_2 = evaluate(name_task2, saved_path_folder)
+        test_accuracy_task_1, cf_t1 = evaluate(name_task1, saved_path_folder, save)
+        test_accuracy_task_2, cf_t2 = evaluate(name_task2, saved_path_folder, save)
         accuracy_data = [i, test_accuracy_task_1, test_accuracy_task_2]
         accuracy_datas.append(accuracy_data)
+        cf_matrices_t1.append(cf_t1)
+        cf_matrices_t2.append(cf_t2)
 
     # File path for the CSV file
     csv_file_path = saved_path_folder + "/" + name + '-test-accuracys.csv'
@@ -200,6 +278,33 @@ def batch_evaluate(name, subject_range, saved_path_folder):
 
     # Print a confirmation message
     print(f"CSV file '{csv_file_path}' created successfully.")
+
+    # ------ Average Confusion Matrix --------
+    # Stack and sum the confusion matrices
+    total_cf_matrix_t1 = np.sum(cf_matrices_t1, axis=0)
+    total_cf_matrix_t2 = np.sum(cf_matrices_t2, axis=0)
+
+    # Normalize by row to get proportions (optional)
+    normalized_cf_matrix_t1 = total_cf_matrix_t1.astype('float') / total_cf_matrix_t1.sum(axis=1, keepdims=True)
+    normalized_cf_matrix_t2 = total_cf_matrix_t2.astype('float') / total_cf_matrix_t2.sum(axis=1, keepdims=True)
+
+    classes = ['rest', 'left-fist', 'right-fist']
+    # Plot the final confusion matrix
+    df_cm_t1 = pd.DataFrame(normalized_cf_matrix_t1, index=classes, columns=classes)
+    sn.heatmap(df_cm_t1, annot=True, cmap='Blues', fmt='.2f')
+    plt.xlabel('Predicted')
+    plt.ylabel('True')
+    plt.title('Average 8-Channel MM Confusion Matrix Across Subjects')
+    plt.savefig("../results/figures/cf_matrix_8ch_MM_all.png")
+    plt.show()
+
+    df_cm_t2 = pd.DataFrame(normalized_cf_matrix_t2, index=classes, columns=classes)
+    sn.heatmap(df_cm_t2, annot=True, cmap='Blues', fmt='.2f')
+    plt.xlabel('Predicted')
+    plt.ylabel('True')
+    plt.title('Average 8-Channel MI Confusion Matrix Across Subjects')
+    plt.savefig("../results/figures/cf_matrix_8ch_MI_all.png")
+    plt.show()
 
 if __name__ == "__main__":
     print("Running 'train_eegnet.py' directly")
@@ -217,10 +322,10 @@ if __name__ == "__main__":
     # evaluate(name, saved_path_folder, pltshow=True, save=False, verbose=True)
     
 
-    # task = 1
-    # load_path_folder = DATA_DIR + "/physionet-fifs-64-channel/task"+ str(task) +"/"
-    # save_path_folder = MODELS_DIR + "/physionet-64-channels/"
-    # # batch_train(task, [1, 10], load_path_folder, save_path_folder, hyperparameters)
+    # task = 2
+    # load_path_folder = DATA_DIR + "/physionet-fifs-8-channel/task"+ str(task) +"/"
+    # save_path_folder = MODELS_DIR + "/physionet-8-channels/"
+    # batch_train(task, [1, 10], load_path_folder, save_path_folder, hyperparameters)
 
     # task = 2
     # load_path_folder = DATA_DIR + "/physionet-fifs-64-channel/task"+ str(task) +"/"
@@ -228,15 +333,19 @@ if __name__ == "__main__":
     # # batch_train(task, [1, 10], load_path_folder, save_path_folder, hyperparameters)
 
     # save_path_folder = MODELS_DIR + "physionet-8-channels/"
-    # batch_evaluate("models-8ch-tasks12-200epoch", [1, 25], save_path_folder)
+    # batch_evaluate("models-8ch-tasks12-200epoch", [1, 109], save_path_folder, save=False)
 
 
     # ----------- TRAIN ON OPEN BCI DATA --------------
-    name = "data-reuben-2122-2205-3-classes-MI"
-    load_path = DATA_DIR + "/reuben-openbci/data-reuben-2122-2205-3-classes/data-reuben-2122-2205-3-classes-MI-epo.fif"
+    name = "data-reuben-2122-2205-3-classes-MM"
+    load_path = DATA_DIR + "/reuben-openbci/data-reuben-2122-2205-3-classes/data-reuben-2122-2205-3-classes-MM-epo.fif"
     save_path_folder = MODELS_DIR + "reuben-openbci/data-reuben-2122-2205-3-classes/"
+    save_path_folder_latex = "/home/reuben/MEGA/uni/Y5-S1/BIOE6100/final-report-latex/figures/"
 
-    # train(name, load_path, save_path_folder, hyperparameters, save=True)
-    evaluate(name, save_path_folder, pltshow=True, save=True, verbose=True)
+    # # train(name, load_path, save_path_folder, hyperparameters, save=True)
+    # evaluate(name, save_path_folder, pltshow=True, save=False, verbose=True)
+
+    load_test_path = DATA_DIR + "/reuben-openbci/data-reuben-2122-2205-3-classes/data-reuben-2122-2205-3-classes-MI-epo.fif"
+    evaluate_MM_on_MI(name, save_path_folder, load_test_path, pltshow=True, save=False, verbose=True)
 
     

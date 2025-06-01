@@ -42,6 +42,7 @@ class EEGNetModel(nn.Module): # EEGNET-8,2
             nn.AvgPool2d((1, pk1)),
             nn.Dropout(dropout_rate)
         )
+        # Seperable Convolution
         self.block3 = nn.Sequential(
             nn.Conv2d(d * f1, f2, (1, 16),  groups=f2, bias=False, padding='same'), # Separable Conv
             nn.Conv2d(f2, f2, kernel_size=1, bias=False), # Pointwise Conv
@@ -60,7 +61,6 @@ class EEGNetModel(nn.Module): # EEGNET-8,2
         #     out = self.block3(out)
         #     out = self.flatten(out)
         #     linear_size = out.shape[1]
-
         
         self.fc = nn.Linear(linear_size, classes)
 
@@ -82,8 +82,6 @@ class EEGNetModel(nn.Module): # EEGNET-8,2
         x = self.flatten(x)
         x = self.fc(x)
         return x
-
-
 
 
 ## TRAINING CLASS
@@ -204,3 +202,4 @@ class EvalModel():
         if pltshow: plt.show()
         else: plt.close(fig)
 
+        return cf_matrix
